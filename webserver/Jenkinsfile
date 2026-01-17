@@ -68,7 +68,8 @@ pipeline {
         stage('Validate Packer Template') {
             steps {
                 sh '''
-                    cd huawei-cloud-image
+                    ls
+                    cd huaweicloud-custom-image/webserver
                     packer validate -var "hcs_region=${params.REGION}" -var "image_name=${params.IMAGE_NAME}" ${params.IMAGE_TYPE}-nginx-huawei.pkr.hcl
                 '''
             }
@@ -77,7 +78,7 @@ pipeline {
         stage('Build Image') {
             steps {
                 sh '''
-                    cd huawei-cloud-image
+                    cd huaweicloud-custom-image/webserver
                     
                     # Create temporary variables file
                     cat > temp-variables.pkrvars.hcl << EOF
