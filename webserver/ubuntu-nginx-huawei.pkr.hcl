@@ -12,7 +12,7 @@ variable "hcs_secret_key" {
 
 variable "hcs_region" {
   type        = string
-  default     = "cn-north-4"
+  default     = "ap-southeast-4"
   description = "Huawei Cloud region"
 }
 
@@ -33,7 +33,7 @@ locals {
   image_name_with_date = "${var.image_name}_${local.timestamp}"
 }
 
-source "hcs-euleros" "ubuntu" {
+source "huaweicloud-ecs" "ubuntu" {
   access_key     = var.hcs_access_key
   secret_key     = var.hcs_secret_key
   region         = var.hcs_region

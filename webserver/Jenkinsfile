@@ -20,6 +20,11 @@ pipeline {
             description: 'Custom name for the image (optional, will use default if empty)'
         )
         string(
+            name: 'SOURCE_IMAGE_ID',
+            defaultValue: '',
+            description: 'SOURCE IMAGE ID for the build environment'
+        )
+        string(
             name: 'VPC_ID',
             defaultValue: '',
             description: 'VPC ID for the build environment'
@@ -54,6 +59,7 @@ pipeline {
                         params.IMAGE_NAME = "${params.IMAGE_TYPE}-nginx-webserver-${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd')}"
                     }
                     echo "Image / OS Type: ${params.IMAGE_TYPE}"
+                    echo "Source Image ID: ${params.SOURCE_IMAGE_ID}"
                     echo "Image Name: ${params.IMAGE_NAME}"
                     echo "Region: ${params.REGION}"
                     echo "VPC ID: ${params.VPC_ID}"
@@ -89,6 +95,7 @@ pipeline {
                     cat > temp-variables.pkrvars.hcl << EOF
                     vpc_id = "${params.VPC_ID}"
                     subnet_id = "${params.SUBNET_ID}"
+                    source_image_id = "${params.SOURCE_IMAGE_ID}"
                     security_group_id = "${params.SECURITY_GROUP_ID}"
                     enterprise_project_id = "${params.ENTERPRISE_PROJECT_ID}"
                     EOF
@@ -97,6 +104,7 @@ pipeline {
                     packer build \
                         -var "hcs_region=${params.REGION}" \
                         -var "image_name=${params.IMAGE_NAME}" \
+                        -var "source_image_id=${params.SOURCE_IMAGE_ID}" \
                         -var-file=temp-variables.pkrvars.hcl \
                         ${params.IMAGE_TYPE}-nginx-huawei.pkr.hcl
 
