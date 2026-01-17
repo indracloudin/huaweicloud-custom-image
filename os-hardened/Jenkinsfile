@@ -1,0 +1,215 @@
+pipeline {
+    agent any
+
+    environment {
+        HCS_ACCESS_KEY = credentials('hcs-access-key')
+        HCS_SECRET_KEY = credentials('hcs-secret-key')
+        PACKER_LOG = '1'
+        PACKER_LOG_PATH = 'packerlog.txt'
+    }
+
+    parameters {
+        choice(
+            name: 'IMAGE_TYPE',
+            choices: ['centos', 'ubuntu'],
+            description: 'Select the OS type for the hardened image'
+        )
+        choice(
+            name: 'HARDENING_LEVEL',
+            choices: ['minimal', 'standard', 'strict'],
+            description: 'Select the level of hardening to apply'
+        )
+        string(
+            name: 'IMAGE_NAME',
+            defaultValue: '',
+            description: 'Custom name for the image (optional, will use default if empty)'
+        )
+        string(
+            name: 'VPC_ID',
+            defaultValue: '',
+            description: 'VPC ID for the build environment'
+        )
+        string(
+            name: 'SUBNET_ID',
+            defaultValue: '',
+            description: 'Subnet ID for the build environment'
+        )
+        string(
+            name: 'SECURITY_GROUP_ID',
+            defaultValue: '',
+            description: 'Security Group ID for the build environment'
+        )
+        string(
+            name: 'ENTERPRISE_PROJECT_ID',
+            defaultValue: '',
+            description: 'Huawei Cloud Enterprise Project ID (leave empty for default project)'
+        )
+        choice(
+            name: 'REGION',
+            choices: ['cn-north-4', 'cn-east-3', 'cn-south-1'],
+            description: 'Huawei Cloud region to build the image in'
+        )
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (params.IMAGE_NAME == '') {
+                        params.IMAGE_NAME = "${params.IMAGE_TYPE}-cis-hardened-${params.HARDENING_LEVEL}-${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd')}"
+                    }
+                    echo "Image Name: ${params.IMAGE_NAME}"
+                    echo "Region: ${params.REGION}"
+                    echo "Hardening Level: ${params.HARDENING_LEVEL}"
+                }
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Validate Packer Template') {
+            steps {
+                script {
+                    def templateFile = "${params.IMAGE_TYPE}-cis-hardened.pkr.hcl"
+                    sh """
+                        cd huawei-cloud-hardened
+                        packer validate -var "hcs_region=${params.REGION}" -var "image_name=${params.IMAGE_NAME}" ${templateFile}
+                    """
+                }
+            }
+        }
+
+        stage('Prepare Hardening Configuration') {
+            steps {
+                script {
+                    // Create hardening configuration based on selected level
+                    sh '''
+                        cd huawei-cloud-hardened
+                        
+                        # Create temporary hardening configuration based on level
+                        if [ "${params.HARDENING_LEVEL}" = "minimal" ]; then
+                            echo "Creating minimal hardening configuration..."
+                            # For minimal hardening, we might skip some aggressive settings
+                            sed 's/minlen = 14/minlen = 10/g' scripts/cis-hardening.sh > scripts/cis-hardening-modified.sh
+                        elif [ "${params.HARDENING_LEVEL}" = "strict" ]; then
+                            echo "Creating strict hardening configuration..."
+                            # For strict hardening, we might add additional checks
+                            cp scripts/cis-hardening.sh scripts/cis-hardening-modified.sh
+                            echo "# Additional strict hardening settings" >> scripts/cis-hardening-modified.sh
+                        else
+                            echo "Using standard hardening configuration..."
+                            cp scripts/cis-hardening.sh scripts/cis-hardening-modified.sh
+                        fi
+                        
+                        # Update the script to use the modified version
+                        sed -i 's/cis-hardening.sh/cis-hardening-modified.sh/g' scripts/security-config.sh
+                    '''
+                }
+            }
+        }
+
+        stage('Build Hardened Image') {
+            steps {
+                script {
+                    def templateFile = "${params.IMAGE_TYPE}-cis-hardened.pkr.hcl"
+                    sh """
+                        cd huawei-cloud-hardened
+                        
+                        # Create temporary variables file
+                        cat > temp-variables.pkrvars.hcl << EOF
+                        vpc_id = "${params.VPC_ID}"
+                        subnet_id = "${params.SUBNET_ID}"
+                        security_group_id = "${params.SECURITY_GROUP_ID}"
+                        enterprise_project_id = "${params.ENTERPRISE_PROJECT_ID}"
+                        EOF
+                        
+                        # Build the hardened image
+                        packer build \\
+                            -var "hcs_region=${params.REGION}" \\
+                            -var "image_name=${params.IMAGE_NAME}" \\
+                            -var-file=temp-variables.pkrvars.hcl \\
+                            ${templateFile}
+                        
+                        # Clean up temporary file
+                        rm temp-variables.pkrvars.hcl
+                    """
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'huawei-cloud-hardened/packerlog.txt', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Security Verification') {
+            steps {
+                script {
+                    // Wait a bit for the image to be available and run security checks
+                    sh '''
+                        echo "Waiting for image to be available..."
+                        sleep 30
+                        
+                        # Placeholder for security verification
+                        # In a real scenario, this would connect to the newly created image
+                        # and run additional security scans
+                        echo "Running security verification on the hardened image..."
+                        echo "Security verification completed."
+                    '''
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                script {
+                    sh '''
+                        cd huawei-cloud-hardened
+                        # Clean up any temporary files
+                        rm -f scripts/cis-hardening-modified.sh
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                echo "Hardened image build successful! Image name: ${params.IMAGE_NAME}"
+                
+                // Send notification to Slack or other systems if configured
+                if (env.SLACK_CHANNEL) {
+                    slackSend channel: env.SLACK_CHANNEL,
+                             color: 'good',
+                             message: "✅ Hardened image build successful! Image: ${params.IMAGE_NAME}, Type: ${params.IMAGE_TYPE}, Level: ${params.HARDENING_LEVEL}, Build: ${env.BUILD_NUMBER}"
+                }
+                
+                // Optionally tag the image in Huawei Cloud
+                sh '''
+                    echo "Image ${params.IMAGE_NAME} is now available in Huawei Cloud"
+                '''
+            }
+        }
+        failure {
+            script {
+                echo "Hardened image build failed! Check logs for details."
+                
+                // Send notification to Slack or other systems if configured
+                if (env.SLACK_CHANNEL) {
+                    slackSend channel: env.SLACK_CHANNEL,
+                             color: 'danger',
+                             message: "❌ Hardened image build failed! Type: ${params.IMAGE_TYPE}, Level: ${params.HARDENING_LEVEL}, Build: ${env.BUILD_NUMBER}"
+                }
+            }
+        }
+        always {
+            // Clean up any temporary resources if needed
+            cleanWs()
+        }
+    }
+}

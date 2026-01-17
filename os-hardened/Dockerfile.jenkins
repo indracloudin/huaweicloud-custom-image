@@ -1,0 +1,57 @@
+# Dockerfile for Jenkins build agent with Packer and security tools for hardened images
+FROM jenkins/inbound-agent:latest
+
+# Install system dependencies
+USER root
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    unzip \
+    jq \
+    python3 \
+    python3-pip \
+    gcc \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Packer
+ARG PACKER_VERSION=1.9.4
+RUN wget https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip \
+    && unzip packer_${PACKER_VERSION}_linux_amd64.zip -d /usr/local/bin \
+    && rm packer_${PACKER_VERSION}_linux_amd64.zip
+
+# Install security scanning tools
+RUN apt-get update && apt-get install -y \
+    lynis \
+    aide \
+    auditd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create jenkins user if it doesn't exist and set proper ownership
+RUN useradd -m -s /bin/bash jenkins || true
+RUN chown -R jenkins:jenkins /usr/local/bin/packer
+
+# Switch back to jenkins user
+USER jenkins
+
+# Set working directory
+WORKDIR /workspace
+
+# Verify installations
+RUN packer version
+RUN lynis --version
+
+# Add any additional tools or configurations as needed
+COPY scripts/ /tmp/scripts/
+RUN chmod +x /tmp/scripts/*.sh
+
+# Set environment variables for security tools
+ENV AUDITD_ENABLED=true
+ENV LYNIS_AUDITOR="Jenkins Pipeline"
+
+# Print installation summary
+RUN echo "Installation Summary:" && \
+    echo "- Packer version: $(packer version)" && \
+    echo "- Lynis version: $(lynis --version)" && \
+    echo "Security tools installed successfully"

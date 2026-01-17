@@ -1,0 +1,35 @@
+# Dockerfile for Jenkins build agent with Packer and Huawei Cloud tools
+FROM jenkins/inbound-agent:jdk21
+
+# Install system dependencies
+USER root
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    unzip \
+    jq \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Packer
+ARG PACKER_VERSION=1.9.4
+RUN wget https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip \
+    && unzip packer_${PACKER_VERSION}_linux_amd64.zip -d /usr/local/bin \
+    && rm packer_${PACKER_VERSION}_linux_amd64.zip
+
+# Create jenkins user if it doesn't exist and set proper ownership
+RUN useradd -m -s /bin/bash jenkins || true
+RUN chown -R jenkins:jenkins /usr/local/bin/packer
+
+# Switch back to jenkins user
+USER jenkins
+
+# Set working directory
+WORKDIR /workspace
+
+# Verify installation
+RUN packer version
+
+# Add any additional tools or configurations as needed

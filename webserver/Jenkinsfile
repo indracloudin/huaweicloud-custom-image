@@ -1,0 +1,155 @@
+pipeline {
+    agent any
+
+    environment {
+        HCS_ACCESS_KEY = credentials('hcs-access-key')
+        HCS_SECRET_KEY = credentials('hcs-secret-key')
+        PACKER_LOG = '1'
+        PACKER_LOG_PATH = 'packerlog.txt'
+    }
+
+    parameters {
+        choice(
+            name: 'IMAGE_TYPE',
+            choices: ['centos', 'ubuntu'],
+            description: 'Select the OS type for the golden image'
+        )
+        string(
+            name: 'IMAGE_NAME',
+            defaultValue: '',
+            description: 'Custom name for the image (optional, will use default if empty)'
+        )
+        string(
+            name: 'VPC_ID',
+            defaultValue: '',
+            description: 'VPC ID for the build environment'
+        )
+        string(
+            name: 'SUBNET_ID',
+            defaultValue: '',
+            description: 'Subnet ID for the build environment'
+        )
+        string(
+            name: 'SECURITY_GROUP_ID',
+            defaultValue: '',
+            description: 'Security Group ID for the build environment'
+        )
+        string(
+            name: 'ENTERPRISE_PROJECT_ID',
+            defaultValue: '',
+            description: 'Huawei Cloud Enterprise Project ID (leave empty for default project)'
+        )
+        choice(
+            name: 'REGION',
+            choices: ['ap-southeast-4', 'cn-east-3', 'cn-south-1'],
+            description: 'Huawei Cloud region to build the image in'
+        )
+    }
+
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (params.IMAGE_NAME == '') {
+                        params.IMAGE_NAME = "${params.IMAGE_TYPE}-nginx-webserver-${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd')}"
+                    }
+                    echo "Image Name: ${params.IMAGE_NAME}"
+                    echo "Region: ${params.REGION}"
+                }
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Validate Packer Template') {
+            steps {
+                sh '''
+                    cd huawei-cloud-image
+                    packer validate -var "hcs_region=${params.REGION}" -var "image_name=${params.IMAGE_NAME}" ${params.IMAGE_TYPE}-nginx-huawei.pkr.hcl
+                '''
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                sh '''
+                    cd huawei-cloud-image
+                    
+                    # Create temporary variables file
+                    cat > temp-variables.pkrvars.hcl << EOF
+                    vpc_id = "${params.VPC_ID}"
+                    subnet_id = "${params.SUBNET_ID}"
+                    security_group_id = "${params.SECURITY_GROUP_ID}"
+                    enterprise_project_id = "${params.ENTERPRISE_PROJECT_ID}"
+                    EOF
+                    
+                    # Build the image
+                    packer build \
+                        -var "hcs_region=${params.REGION}" \
+                        -var "image_name=${params.IMAGE_NAME}" \
+                        -var-file=temp-variables.pkrvars.hcl \
+                        ${params.IMAGE_TYPE}-nginx-huawei.pkr.hcl
+                    
+                    # Clean up temporary file
+                    rm temp-variables.pkrvars.hcl
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'huawei-cloud-image/packerlog.txt', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Verify Image') {
+            steps {
+                script {
+                    // Wait a bit for the image to be available
+                    sleep 30
+                    
+                    // Verify the image was created successfully
+                    sh '''
+                        # This would typically call Huawei Cloud CLI to verify the image exists
+                        # Placeholder for actual verification logic
+                        echo "Verifying image creation..."
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                echo "Image build successful! Image name: ${params.IMAGE_NAME}"
+                
+                // Send notification to Slack or other systems if configured
+                if (env.SLACK_CHANNEL) {
+                    slackSend channel: env.SLACK_CHANNEL,
+                             color: 'good',
+                             message: "✅ Golden image build successful! Image: ${params.IMAGE_NAME}, Type: ${params.IMAGE_TYPE}, Build: ${env.BUILD_NUMBER}"
+                }
+            }
+        }
+        failure {
+            script {
+                echo "Image build failed! Check logs for details."
+                
+                // Send notification to Slack or other systems if configured
+                if (env.SLACK_CHANNEL) {
+                    slackSend channel: env.SLACK_CHANNEL,
+                             color: 'danger',
+                             message: "❌ Golden image build failed! Type: ${params.IMAGE_TYPE}, Build: ${env.BUILD_NUMBER}"
+                }
+            }
+        }
+        always {
+            // Clean up any temporary resources if needed
+            cleanWs()
+        }
+    }
+}
