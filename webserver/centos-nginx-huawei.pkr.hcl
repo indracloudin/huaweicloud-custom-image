@@ -12,7 +12,7 @@ variable "hcs_secret_key" {
 
 variable "hcs_region" {
   type        = string
-  default     = "cn-north-4"
+  default     = "ap-southeast-4"
   description = "Huawei Cloud region"
 }
 
@@ -33,13 +33,13 @@ locals {
   image_name_with_date = "${var.image_name}_${local.timestamp}"
 }
 
-source "hcs-euleros" "centos" {
+source "huaweicloud-ecs" "centos" {
   access_key     = var.hcs_access_key
   secret_key     = var.hcs_secret_key
   region         = var.hcs_region
   enterprise_project_id = var.enterprise_project_id
 
-  source_image   = "Standard_CentOS_7_latest"  # Or appropriate CentOS image ID
+  source_image   = "${var.source_image_id}"  # Or appropriate CentOS image ID
   image_name     = local.image_name_with_date
   image_description = "CentOS 7 with NGINX, log rotation, and health checks"
 
@@ -52,10 +52,10 @@ source "hcs-euleros" "centos" {
   security_group_ids = ["${var.security_group_id}"]  # Define variable if needed
 
   # Cleanup settings
-  shutdown_behavior = "terminate"
+  # shutdown_behavior = "terminate"
 
   # Boot commands if needed
-  boot_commands = []
+  # boot_commands = []
 }
 
 build {
