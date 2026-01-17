@@ -53,8 +53,13 @@ pipeline {
                     if (params.IMAGE_NAME == '') {
                         params.IMAGE_NAME = "${params.IMAGE_TYPE}-nginx-webserver-${env.BUILD_NUMBER}-${new Date().format('yyyyMMdd')}"
                     }
+                    echo "Image / OS Type: ${params.IMAGE_TYPE}"
                     echo "Image Name: ${params.IMAGE_NAME}"
                     echo "Region: ${params.REGION}"
+                    echo "VPC ID: ${params.VPC_ID}"
+                    echo "SUBNET ID: ${params.SUBNET_ID}"
+                    echo "SECURITY GROUP ID: ${params.SECURITY_GROUP_ID}"
+                    echo "ENTERPRISE PROJECT ID: ${params.ENTERPRISE_PROJECT_ID}"
                 }
             }
         }
