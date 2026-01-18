@@ -28,6 +28,26 @@ variable "enterprise_project_id" {
   description = "Huawei Cloud Enterprise Project ID (leave empty for default project)"
 }
 
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID for the build environment"
+}
+
+variable "subnet_id" {
+  type        = string
+  description = "Subnet ID for the build environment"
+}
+
+variable "source_image_id" {
+  type        = string
+  description = "Source image ID for the build environment"
+}
+
+variable "security_group_id" {
+  type        = string
+  description = "Security group ID for the build environment"
+}
+
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
   image_name_with_date = "${var.image_name}_${local.timestamp}"
@@ -39,12 +59,12 @@ source "huaweicloud-ecs" "centos" {
   region         = var.hcs_region
   enterprise_project_id = var.enterprise_project_id
 
-  source_image   = var.source_image_id  # Or appropriate Ubuntu image ID
+  source_image   = var.source_image_id  # CentOS 7.x image ID
   image_name     = local.image_name_with_date
   image_description = "CentOS 7.x with NGINX, log rotation, and health checks"
 
   flavor         = "s7n.small.1"  # Small instance for building
-  ssh_username   = "root"  # Or ubuntu depending on image
+  ssh_username   = "root"  # CentOS images typically use 'root' as the default user
 
   # Network configuration
   vpc_id             = "${var.vpc_id}"           # Define variable if needed
@@ -52,7 +72,7 @@ source "huaweicloud-ecs" "centos" {
   security_group_ids = ["${var.security_group_id}"]  # Define variable if needed
 
   # Cleanup settings
-  # shutdown_behavior = "terminate"
+  shutdown_behavior = "terminate"
 
   # Boot commands if needed
   # boot_commands = []
@@ -61,7 +81,7 @@ source "huaweicloud-ecs" "centos" {
 build {
   name = "centos-nginx-webserver"
   sources = [
-    "source.hcs-euleros.centos"
+    "source.huaweicloud-ecs.centos"
   ]
 
   # Provisioning scripts
