@@ -104,6 +104,9 @@ pipeline {
                     enterprise_project_id = "${params.ENTERPRISE_PROJECT_ID}"
                     EOF
 
+                    # Packer init
+                    packer init .
+
                     # Build the image
                     packer build \
                         -var "hcs_region=${params.REGION}" \
