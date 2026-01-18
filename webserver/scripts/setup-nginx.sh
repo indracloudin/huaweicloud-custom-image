@@ -5,6 +5,32 @@ set -e
 
 echo "Starting NGINX setup..."
 
+# Detect the OS
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$NAME
+    VER=$VERSION_ID
+else
+    echo "Cannot detect OS. Exiting."
+    exit 1
+fi
+
+# Install NGINX based on OS
+if [[ "$OS" == *"CentOS"* ]] || [[ "$OS" == *"Red Hat"* ]]; then
+    # CentOS/RHEL
+    yum update -y
+    yum install -y nginx wget curl vim htop logrotate
+    NGINX_USER="nginx"
+elif [[ "$OS" == *"Ubuntu"* ]] || [[ "$OS" == *"Debian"* ]]; then
+    # Ubuntu/Debian
+    apt-get update
+    apt-get install -y nginx wget curl vim htop logrotate
+    NGINX_USER="www-data"
+else
+    echo "Unsupported OS: $OS"
+    exit 1
+fi
+
 # Enable and start NGINX service
 systemctl enable nginx
 systemctl start nginx
@@ -75,16 +101,17 @@ EOF
 
 # For CentOS, the default site config might be in a different location
 if [ -f /etc/nginx/nginx.conf ]; then
-    # Backup original config
-    cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-    
-    # Modify nginx.conf to include our server block
-    sed -i '/# Virtual Host configuration/d' /etc/nginx/nginx.conf
-    sed -i '/include \/etc\/nginx\/conf.d\/\*.conf;/a \    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
-    
-    # Create sites-enabled directory if it doesn't exist
+    # Create sites-available and sites-enabled directories if they don't exist
+    mkdir -p /etc/nginx/sites-available
     mkdir -p /etc/nginx/sites-enabled
-    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+
+    # Add include directive for sites-enabled if not already present
+    if ! grep -q "sites-enabled" /etc/nginx/nginx.conf; then
+        sed -i '/include \/etc\/nginx\/conf.d\/\*.conf;/a \    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
+    fi
+
+    # Create symlink to enable the site (the default config was already created above)
+    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
 fi
 
 # Create directory for custom log rotation
@@ -112,8 +139,8 @@ cat > /etc/logrotate.d/nginx-custom << 'EOF'
 }
 EOF
 
-# Set proper permissions
-chown -R nginx:nginx /var/www/html/
+# Set proper permissions using the appropriate user for the OS
+chown -R $NGINX_USER:$NGINX_USER /var/www/html/
 chmod -R 755 /var/www/html/
 
 # Test NGINX configuration

@@ -28,6 +28,26 @@ variable "enterprise_project_id" {
   description = "Huawei Cloud Enterprise Project ID (leave empty for default project)"
 }
 
+variable "vpc_id" {
+  type        = string
+  description = "VPC ID for the build environment"
+}
+
+variable "subnet_id" {
+  type        = string
+  description = "Subnet ID for the build environment"
+}
+
+variable "source_image_id" {
+  type        = string
+  description = "Source image ID for the build environment"
+}
+
+variable "security_group_id" {
+  type        = string
+  description = "Security group ID for the build environment"
+}
+
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
   image_name_with_date = "${var.image_name}_${local.timestamp}"
@@ -39,16 +59,16 @@ source "huaweicloud-ecs" "ubuntu" {
   region         = var.hcs_region
   enterprise_project_id = var.enterprise_project_id
 
-  source_image   = "Ubuntu_20.04_server_64bit"  # Or appropriate Ubuntu image ID
+  source_image   = var.source_image_id  # Ubuntu 20.04 LTS image ID
   image_name     = local.image_name_with_date
   image_description = "Ubuntu 20.04 with NGINX, log rotation, and health checks"
 
-  flavor         = "s6.small.1"  # Small instance for building
-  ssh_username   = "root"  # Or ubuntu depending on image
+  flavor         = "s7n.small.1"  # Small instance for building
+  ssh_username   = "ubuntu"  # Ubuntu images typically use 'ubuntu' as the default user
 
   # Network configuration
-  vpc_id         = "${var.vpc_id}"           # Define variable if needed
-  subnet_id      = "${var.subnet_id}"        # Define variable if needed
+  vpc_id             = "${var.vpc_id}"           # Define variable if needed
+  subnets            = ["${var.subnet_id}"]       # Define variable if needed
   security_group_ids = ["${var.security_group_id}"]  # Define variable if needed
 
   # Cleanup settings
@@ -61,7 +81,7 @@ source "huaweicloud-ecs" "ubuntu" {
 build {
   name = "ubuntu-nginx-webserver"
   sources = [
-    "source.hcs-euleros.ubuntu"
+    "source.huaweicloud-ecs.ubuntu"
   ]
 
   # Provisioning scripts
@@ -97,6 +117,7 @@ build {
       "rm -rf /tmp/*",
       "rm -rf /root/.bash_history",
       "history -c",
+      "cat /dev/null > /root/.bash_history",
       "unset HISTFILE"
     ]
   }

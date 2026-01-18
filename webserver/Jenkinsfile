@@ -79,9 +79,11 @@ pipeline {
         stage('Validate Packer Template') {
             steps {
                 sh '''
-                    ls
+                    pwd
+                    ls -la
                     cd webserver
-                    packer validate -var "hcs_region=${params.REGION}" -var "image_name=${params.IMAGE_NAME}" ${params.IMAGE_TYPE}-nginx-huawei.pkr.hcl
+                    ls -la
+                    packer validate -var "hcs_region='${params.REGION}'" -var "image_name='${params.IMAGE_NAME}'" ${params.IMAGE_TYPE}-nginx-huawei.pkr.hcl
                 '''
             }
         }
@@ -90,6 +92,8 @@ pipeline {
             steps {
                 sh '''
                     cd webserver
+                    pwd
+                    ls -la
 
                     # Create temporary variables file
                     cat > temp-variables.pkrvars.hcl << EOF
@@ -114,7 +118,7 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'huawei-cloud-image/packerlog.txt', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'packerlog.txt', allowEmptyArchive: true
                 }
             }
         }
