@@ -64,12 +64,12 @@ source "huaweicloud-ecs" "ubuntu" {
   image_description = "Ubuntu 20.04 with NGINX, log rotation, and health checks"
 
   flavor         = "s7n.small.1"  # Small instance for building
-  ssh_username   = "ubuntu"  # Ubuntu images typically use 'ubuntu' as the default user
+  ssh_username   = "root"  # Ubuntu images typically use 'ubuntu' as the default user
 
   # Network configuration
   vpc_id             = "${var.vpc_id}"           # Define variable if needed
   subnets            = ["${var.subnet_id}"]       # Define variable if needed
-  security_group_ids = ["${var.security_group_id}"]  # Define variable if needed
+  security_groups    = ["${var.security_group_id}"]  # Define variable if needed
 
   # Cleanup settings
   shutdown_behavior = "terminate"
