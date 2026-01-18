@@ -94,9 +94,11 @@ pipeline {
                     cd webserver
                     pwd
                     ls -la
+                    # create tmp_file
+                    TMP_FILE="$(mktemp)"
 
                     # Create temporary variables file
-                    cat > temp-variables.pkrvars.hcl << EOF
+                    cat > "$TMP_FILE" <<EOF
                     vpc_id = "${params.VPC_ID}"
                     subnet_id = "${params.SUBNET_ID}"
                     source_image_id = "${params.SOURCE_IMAGE_ID}"
@@ -104,6 +106,9 @@ pipeline {
                     enterprise_project_id = "${params.ENTERPRISE_PROJECT_ID}"
                     EOF
 
+                    # Move into place atomically
+                    mv "$TMP_FILE" temp-variables.pkrvars.hcl
+                    
                     # Packer init
                     packer init .
 
