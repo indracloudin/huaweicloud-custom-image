@@ -39,16 +39,16 @@ source "huaweicloud-ecs" "ubuntu" {
   region         = var.hcs_region
   enterprise_project_id = var.enterprise_project_id
 
-  source_image   = "Ubuntu_20.04_server_64bit"  # Or appropriate Ubuntu image ID
+  source_image   = var.source_image_id  # Or appropriate Ubuntu image ID
   image_name     = local.image_name_with_date
   image_description = "Ubuntu 20.04 with NGINX, log rotation, and health checks"
 
-  flavor         = "s6.small.1"  # Small instance for building
+  flavor         = "s7n.small.1"  # Small instance for building
   ssh_username   = "root"  # Or ubuntu depending on image
 
   # Network configuration
-  vpc_id         = "${var.vpc_id}"           # Define variable if needed
-  subnet_id      = "${var.subnet_id}"        # Define variable if needed
+  vpc_id             = "${var.vpc_id}"           # Define variable if needed
+  subnets            = ["${var.subnet_id}"]       # Define variable if needed
   security_group_ids = ["${var.security_group_id}"]  # Define variable if needed
 
   # Cleanup settings
